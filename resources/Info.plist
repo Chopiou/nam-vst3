@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>English</string>
+    <key>CFBundleExecutable</key>
+    <string>NAMLoader</string>
+    <key>CFBundleGetInfoString</key>
+    <string>NAM Loader VST3 Plugin, Copyright 2025 Chopiou</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.chopiou.namloader</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>NAM Loader</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleSignature</key>
+    <string>VST3</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CSResourcesFileMapped</key>
+    <true/>
+    <key>DTPlatformName</key>
+    <string>linux</string>
+    <key>NSPrincipalClass</key>
+    <string>NAMController</string>
+    <key>VST3Plugin</key>
+    <dict>
+        <key>Categories</key>
+        <array>
+            <string>Fx</string>
+        </array>
+        <key>ClassID</key>
+        <string>8F7A3B2C-4D5E-4F6A-8B9C-0D1E2F3A4B5C</string>
+        <key>ControllerClassID</key>
+        <string>A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D</string>
+        <key>SubCategories</key>
+        <array>
+            <string>Amp</string>
+            <string>Modeling</string>
+        </array>
+        <key>Vendor</key>
+        <string>Chopiou</string>
+        <key>Version</key>
+        <string>1.0.0</string>
+    </dict>
+</dict>
+</plist>
