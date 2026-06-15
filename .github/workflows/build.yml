@@ -103,8 +103,10 @@ jobs:
           SHA256: ${{ steps.update_sha256.outputs.SHA256 }}
         run: |
           VERSION="${TAG#v}"
-          sed -i 's/sha256 "PLACEHOLDER_UPDATED_BY_CI"/sha256 "'"${SHA256}"'"/' Formula/namloader.rb
-          sed -i 's/version "0.1.0"/version "'"${VERSION}"'"/' Formula/namloader.rb
+          # Match any version format (with or without v prefix, any numbers)
+          sed -i -E 's/version "[^"]+"/version "'"${VERSION}"'"/' Formula/namloader.rb
+          # Match any sha256 value
+          sed -i -E 's/sha256 "[^"]+"/sha256 "'"${SHA256}"'"/' Formula/namloader.rb
           cat Formula/namloader.rb
 
       - name: Commit SHA256 to homebrew tap
