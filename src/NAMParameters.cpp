@@ -1,5 +1,6 @@
 #include "NAMParameters.h"
 #include <cmath>
+#include <algorithm>
 
 namespace NAMParams {
     
