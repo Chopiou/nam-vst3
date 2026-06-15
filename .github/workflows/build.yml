@@ -48,7 +48,8 @@ jobs:
       - name: Ad-hoc codesign (no Apple ID required)
         run: |
           codesign --force --deep --sign - --timestamp=none build/NAMLoader.vst3
-      - name: Package macOS universal tar.gz
+      - name: Package macOS universal tar.gz (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           VERSION=${GITHUB_REF_NAME#v}
           tar -czf "Namloader-v${VERSION}-macos-universal.vst3.tar.gz" -C build NAMLoader.vst3
@@ -58,11 +59,12 @@ jobs:
           name: NAMLoader-macos.vst3
           path: build/NAMLoader.vst3
           retention-days: 30
-      - name: Upload macOS tar.gz for release
+      - name: Upload macOS tar.gz for release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: Namloader-macos-universal.tar.gz
-          path: Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz
+          path: "Namloader-v${{ github.ref_name }}.tar.gz"
           retention-days: 30
 
   windows:
@@ -93,7 +95,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      # Required for pushing to homebrew tap repo
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -105,19 +106,19 @@ jobs:
         with:
           files: |
             artifacts/NAMLoader-linux.vst3/NAMLoader.vst3
-            artifacts/Namloader-macos-universal.tar.gz/Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz
+            artifacts/Namloader-macos-universal.tar.gz/Namloader-v${{ github.ref_name }}.tar.gz
             artifacts/NAMLoader-windows.vst3/NAMLoader.vst3
           generate_release_notes: true
 
       - name: Update Homebrew tap SHA256
+        id: update_sha256
         if: success()
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          TARBALL="Namloader-v${VERSION}-macos-universal.vst3.tar.gz"
-          # Find the downloaded tarball
+          VERSION=${{ github.ref_name }}
+          TARBALL="Namloader-v${VERSION}.tar.gz"
           TARBALL_PATH=$(find artifacts -name "$TARBALL" | head -1)
           if [ -z "$TARBALL_PATH" ] || [ ! -f "$TARBALL_PATH" ]; then
-            echo "Tarball not found: $TARBALL"
+            echo "Tarball not found: $TARBALL" >&2
             exit 1
           fi
           SHA256=$(sha256sum "$TARBALL_PATH" | cut -d' ' -f1)
@@ -138,10 +139,10 @@ jobs:
           body: |
             Auto-update SHA256 for [Namloader ${{ github.ref_name }}](https://github.com/Chopiou/nam-vst3/releases/tag/${{ github.ref_name }})
             
-            - Tarball: `Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz`
-            - SHA256: `${{ steps.update_homebrew_tap_sha256.outputs.SHA256 }}`
+            - Tarball: `Namloader-v${{ github.ref_name }}.tar.gz`
+            - SHA256: `${{ steps.update_sha256.outputs.SHA256 }}`
           files: |
             Formula/namloader.rb
           path-modification: |
-            sed -i '' 's/sha256 "PLACEHOLDER_UPDATED_BY_CI"/sha256 "${{ steps.update_homebrew_tap_sha256.outputs.SHA256 }}"/' Formula/namloader.rb
-            sed -i '' 's/version "0.1.0"/version "${{ github.ref_name#v }}"/' Formula/namloader.rb
+            sed -i 's/sha256 "PLACEHOLDER_UPDATED_BY_CI"/sha256 "${{ steps.update_sha256.outputs.SHA256 }}"/' Formula/namloader.rb
+            sed -i 's/version "0.1.0"/version "${{ github.ref_name }}"/' Formula/namloader.rb
