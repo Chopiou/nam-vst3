@@ -19,31 +19,57 @@ if(NOT EXISTS "${VST3_SDK_PATH}/public.sdk/source/main/pluginfactory.cpp")
   message(FATAL_ERROR "VST3 SDK not found at ${VST3_SDK_PATH}. Set VST3_SDK_PATH or VST3_SDK_PATH env var.")
 endif()
 
+# Platform-specific VST3 SDK sources
+if(APPLE)
+  # macOS: exclude linuxmain.cpp, include macmain.cpp if available
+  set(VST3_PLATFORM_SOURCES
+    ${VST3_SDK_PATH}/public.sdk/source/main/macmain.cpp
+  )
+  set(VST3_COMMON_SOURCES
+    ${VST3_SDK_PATH}/public.sdk/source/common/memorystream.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/commonstringconvert.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/pluginview.cpp
+  )
+elseif(LINUX)
+  set(VST3_PLATFORM_SOURCES
+    ${VST3_SDK_PATH}/public.sdk/source/main/linuxmain.cpp
+  )
+  set(VST3_COMMON_SOURCES
+    ${VST3_SDK_PATH}/public.sdk/source/common/memorystream.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/commonstringconvert.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/pluginview.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/threadchecker_linux.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/systemclipboard_linux.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/readfile.cpp
+  )
+else()
+  message(FATAL_ERROR "Unsupported platform for VST3 SDK sources")
+endif()
+
 # Plugin configuration
 set(PLUGIN_NAME "NAMLoader")
 
 # Find required packages
 find_package(PkgConfig REQUIRED)
-find_package(X11 REQUIRED)
+if(LINUX)
+  find_package(X11 REQUIRED)
+endif()
 
 # Eigen3 - use include directories directly
-include_directories(/usr/include/eigen3)
+if(LINUX)
+  include_directories(/usr/include/eigen3)
+elseif(APPLE)
+  include_directories(/opt/homebrew/include/eigen3 /usr/local/include/eigen3)
+endif()
 
-# VST3 SDK core sources (excluding vstguieditor which requires VSTGUI)
-set(VST3_SOURCES
+# VST3 SDK core sources
+set(VST3_CORE_SOURCES
     # Main entry points
     ${VST3_SDK_PATH}/public.sdk/source/main/pluginfactory.cpp
     ${VST3_SDK_PATH}/public.sdk/source/main/moduleinit.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/main/linuxmain.cpp
-    
+    ${VST3_PLATFORM_SOURCES}
     # Common utilities
-    ${VST3_SDK_PATH}/public.sdk/source/common/memorystream.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/commonstringconvert.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/pluginview.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/readfile.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/systemclipboard_linux.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/threadchecker_linux.cpp
-    
+    ${VST3_COMMON_SOURCES}
     # VST base classes (excluding vstguieditor.cpp)
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstcomponent.cpp
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstcomponentbase.cpp
@@ -74,54 +100,90 @@ set(PLUGIN_SOURCES
 )
 
 # All sources
-set(ALL_SOURCES ${VST3_SOURCES} ${VST3_BASE_SOURCES} ${PLUGIN_SOURCES})
+set(ALL_SOURCES ${VST3_CORE_SOURCES} ${VST3_BASE_SOURCES} ${PLUGIN_SOURCES})
 
 # Include directories - must include SDK root for pluginterfaces and base
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${VST3_SDK_PATH}                    # For pluginterfaces/, base/
     ${VST3_SDK_PATH}/public.sdk/source  # For public.sdk/source/vst/...
-    /usr/include/eigen3
 )
 
 # Create plugin as shared library
 add_library(${PLUGIN_NAME} MODULE ${ALL_SOURCES})
 
-# Set output properties for VST3 on Linux
-set_target_properties(${PLUGIN_NAME} PROPERTIES
-    PREFIX ""
-    SUFFIX ".so"
-    OUTPUT_NAME "NAMLoader"
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    POSITION_INDEPENDENT_CODE ON
-)
-
-# Compile definitions
-target_compile_definitions(${PLUGIN_NAME} PRIVATE
-    VST3_API
-    __linux__
-    LINUX
-    _LARGEFILE64_SOURCE
-    NDEBUG
-)
-
-# Link libraries
-target_link_libraries(${PLUGIN_NAME} PRIVATE
-    dl
-    pthread
-    ${X11_LIBRARIES}
-)
+# Platform-specific target properties and compile definitions
+if(APPLE)
+  # macOS bundle properties
+  set_target_properties(${PLUGIN_NAME} PROPERTIES
+      PREFIX ""
+      SUFFIX ".vst3"
+      OUTPUT_NAME "NAMLoader"
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      POSITION_INDEPENDENT_CODE ON
+      MACOSX_BUNDLE TRUE
+      MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
+  )
+  target_compile_definitions(${PLUGIN_NAME} PRIVATE
+      VST3_API
+      MAC
+      MACOS
+      _LARGEFILE64_SOURCE
+      NDEBUG
+  )
+  target_link_libraries(${PLUGIN_NAME} PRIVATE
+      "-framework Cocoa"
+      "-framework AudioToolbox"
+      "-framework CoreFoundation"
+  )
+elseif(LINUX)
+  # Linux VST3 properties
+  set_target_properties(${PLUGIN_NAME} PROPERTIES
+      PREFIX ""
+      SUFFIX ".so"
+      OUTPUT_NAME "NAMLoader"
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      POSITION_INDEPENDENT_CODE ON
+  )
+  target_compile_definitions(${PLUGIN_NAME} PRIVATE
+      VST3_API
+      __linux__
+      LINUX
+      _LARGEFILE64_SOURCE
+      NDEBUG
+  )
+  target_link_libraries(${PLUGIN_NAME} PRIVATE
+      dl
+      pthread
+      ${X11_LIBRARIES}
+  )
+endif()
 
 # Create VST3 bundle structure after build
-add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/x86_64-linux
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:${PLUGIN_NAME}>
-        $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/x86_64-linux/NAMLoader.so
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
-        $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/Info.plist
-    COMMENT "Creating VST3 bundle"
-)
+if(APPLE)
+  add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/MacOS
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          $<TARGET_FILE:${PLUGIN_NAME}>
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/MacOS/NAMLoader
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/Info.plist
+      COMMENT "Creating macOS VST3 bundle"
+  )
+elseif(LINUX)
+  add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/x86_64-linux
+      COMMAND ${CMAKE_COMMAND} -E copy
+          $<TARGET_FILE:${PLUGIN_NAME}>
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/x86_64-linux/NAMLoader.so
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/Info.plist
+      COMMENT "Creating Linux VST3 bundle"
+  )
+endif()
