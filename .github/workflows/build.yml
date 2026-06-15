@@ -87,7 +87,16 @@ jobs:
           echo "Tarball: $TARBALL"
           echo "SHA256: $SHA256"
 
+      - name: Checkout Homebrew tap
+        if: success()
+        uses: actions/checkout@v4
+        with:
+          repository: Chopiou/homebrew-namloader
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-namloader
+
       - name: Commit SHA256 to homebrew tap
+        if: success()
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -103,6 +112,7 @@ jobs:
             - SHA256: `${{ steps.update_sha256.outputs.SHA256 }}`
           files: |
             Formula/namloader.rb
+          path: homebrew-namloader
           path-modification: |
             sed -i 's/sha256 "PLACEHOLDER_UPDATED_BY_CI"/sha256 "${{ steps.update_sha256.outputs.SHA256 }}"/' Formula/namloader.rb
             sed -i 's/version "0.1.0"/version "${{ github.ref_name }}"/' Formula/namloader.rb
