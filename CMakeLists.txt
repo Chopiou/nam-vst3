@@ -21,14 +21,20 @@ endif()
 
 # Platform-specific VST3 SDK sources
 if(APPLE)
-  # macOS: exclude linuxmain.cpp, include macmain.cpp if available
+  # macOS: exclude linuxmain.cpp, include macmain.cpp
   set(VST3_PLATFORM_SOURCES
     ${VST3_SDK_PATH}/public.sdk/source/main/macmain.cpp
   )
   set(VST3_COMMON_SOURCES
     ${VST3_SDK_PATH}/public.sdk/source/common/memorystream.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/commonstringconvert.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/commoniids.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/pluginview.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/readfile.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/openurl.cpp
+    # macOS platform-specific (ObjC++)
+    ${VST3_SDK_PATH}/public.sdk/source/common/threadchecker_mac.mm
+    ${VST3_SDK_PATH}/public.sdk/source/common/systemclipboard_mac.mm
   )
 elseif(LINUX)
   set(VST3_PLATFORM_SOURCES
@@ -37,10 +43,12 @@ elseif(LINUX)
   set(VST3_COMMON_SOURCES
     ${VST3_SDK_PATH}/public.sdk/source/common/memorystream.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/commonstringconvert.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/commoniids.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/pluginview.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/readfile.cpp
+    ${VST3_SDK_PATH}/public.sdk/source/common/openurl.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/threadchecker_linux.cpp
     ${VST3_SDK_PATH}/public.sdk/source/common/systemclipboard_linux.cpp
-    ${VST3_SDK_PATH}/public.sdk/source/common/readfile.cpp
   )
 else()
   message(FATAL_ERROR "Unsupported platform for VST3 SDK sources")
@@ -66,22 +74,42 @@ endif()
 # VST3 SDK Static Library (base + public.sdk sources)
 # ============================================================================
 
-# VST3 Base sources
-set(VST3_BASE_SOURCES
-    ${VST3_SDK_PATH}/base/source/fobject.cpp
-    ${VST3_SDK_PATH}/base/source/fstring.cpp
-    ${VST3_SDK_PATH}/base/source/fdebug.cpp
+# ============================================================================
+# VST3 SDK — All required source files for a successful link on macOS
+# ============================================================================
+
+# --- pluginterfaces/base/ sources (CRITICAL — missing = FUID/UString linker errors) ---
+set(VST3_PLUGINTERFACE_SOURCES
+    ${VST3_SDK_PATH}/pluginterfaces/base/funknown.cpp       # FUID::getLong1/2/3/4(), FUnknown impl
+    ${VST3_SDK_PATH}/pluginterfaces/base/ustring.cpp        # UString::copyTo, scanInt, scanFloat, assign
+    ${VST3_SDK_PATH}/pluginterfaces/base/coreiids.cpp       # DEF_CLASS_IID: FUnknown, IBStream, IPluginBase
+    ${VST3_SDK_PATH}/pluginterfaces/base/conststringtable.cpp # ConstStringTable support
 )
 
-# VST3 SDK core sources
-set(VST3_CORE_SOURCES
+# --- base/source/ sources ---
+set(VST3_BASE_SOURCES
+    ${VST3_SDK_PATH}/base/source/fobject.cpp                # FObject base class
+    ${VST3_SDK_PATH}/base/source/fstring.cpp                # ConstString, string ops
+    ${VST3_SDK_PATH}/base/source/fdebug.cpp                 # Debug/trace utilities
+    ${VST3_SDK_PATH}/base/source/baseiids.cpp               # DEF_CLASS_IID: IString, IPersistent, IAttributes
+    ${VST3_SDK_PATH}/base/source/fbuffer.cpp                # Buffer utilities
+    ${VST3_SDK_PATH}/base/source/fdynlib.cpp                # Dynamic library loading
+    ${VST3_SDK_PATH}/base/source/fstreamer.cpp              # Stream I/O utilities
+    ${VST3_SDK_PATH}/base/source/timer.cpp                  # Timer support (component lifecycle)
+    ${VST3_SDK_PATH}/base/source/updatehandler.cpp          # Update handler (IDependent)
+)
+
+# --- public.sdk/source/ core sources ---
+set(VST3_PUBLICSDK_SOURCES
     # Main entry points
     ${VST3_SDK_PATH}/public.sdk/source/main/pluginfactory.cpp
     ${VST3_SDK_PATH}/public.sdk/source/main/moduleinit.cpp
     ${VST3_PLATFORM_SOURCES}
     # Common utilities
     ${VST3_COMMON_SOURCES}
-    # VST base classes (excluding vstguieditor.cpp)
+    # VST interface IIDs (CRITICAL -- missing = VST interface IID linker errors)
+    ${VST3_SDK_PATH}/public.sdk/source/vst/vstinitiids.cpp
+    # VST base classes (excluding vstguieditor.cpp for minimal build)
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstcomponent.cpp
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstcomponentbase.cpp
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstbus.cpp
@@ -94,7 +122,10 @@ set(VST3_CORE_SOURCES
 )
 
 # Create VST3 SDK static library
-add_library(vst3sdk_static STATIC ${VST3_BASE_SOURCES} ${VST3_CORE_SOURCES})
+add_library(vst3sdk_static STATIC ${VST3_BASE_SOURCES} ${VST3_PLUGINTERFACE_SOURCES} ${VST3_PUBLICSDK_SOURCES})
+
+# Must be compiled with PIC since it's linked into a shared MODULE (.vst3 / .so)
+set_target_properties(vst3sdk_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(vst3sdk_static PUBLIC
     ${VST3_SDK_PATH}

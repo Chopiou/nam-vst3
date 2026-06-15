@@ -20,10 +20,10 @@ jobs:
           git clone --depth 1 --recurse-submodules --branch v3.8.0_build_66 https://github.com/steinbergmedia/vst3sdk.git "${{ runner.temp }}/vst3sdk"
       - name: Install dependencies
         run: |
-          brew install cmake eigen
+          brew install cmake eigen pkg-config
       - name: Build macOS VST3 (Universal)
         run: |
-          mkdir build && cd build
+          rm -rf build && mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DVST3_SDK_PATH="${{ runner.temp }}/vst3sdk"
           cmake --build . --config Release -j$(sysctl -n hw.ncpu)
       - name: Ad-hoc codesign (no Apple ID required)
@@ -31,9 +31,12 @@ jobs:
           codesign --force --deep --sign - --timestamp=none build/NAMLoader.vst3
       - name: Package macOS universal tar.gz (tags only)
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          tar -czf "Namloader-v${VERSION}.tar.gz" -C build NAMLoader.vst3
+          VERSION="${TAG#v}"
+          tar -czf "Namloader-${TAG}.tar.gz" -C build NAMLoader.vst3
+          echo "TAR_NAME=Namloader-${TAG}.tar.gz" >> $GITHUB_ENV
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -44,8 +47,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: Namloader-macos-universal.tar.gz
-          path: "Namloader-v${{ github.ref_name }}.tar.gz"
+          name: Namloader-macos-universal
+          path: "${{ env.TAR_NAME }}"
           retention-days: 30
 
   release:
@@ -60,27 +63,27 @@ jobs:
         with:
           path: artifacts
       - name: Create release
-        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/Namloader-macos-universal.tar.gz/Namloader-v${{ github.ref_name }}.tar.gz
+            artifacts/Namloader-macos-universal/Namloader-${{ github.ref_name }}.tar.gz
           generate_release_notes: true
-
       - name: Update Homebrew tap SHA256
         id: update_sha256
         if: success()
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          VERSION=${{ github.ref_name }}
-          TARBALL="Namloader-v${VERSION}.tar.gz"
+          TARBALL="Namloader-${TAG}.tar.gz"
           TARBALL_PATH=$(find artifacts -name "$TARBALL" | head -1)
           if [ -z "$TARBALL_PATH" ] || [ ! -f "$TARBALL_PATH" ]; then
             echo "Tarball not found: $TARBALL" >&2
+            find artifacts -type f -name "*.tar.gz" 2>/dev/null
             exit 1
           fi
           SHA256=$(sha256sum "$TARBALL_PATH" | cut -d' ' -f1)
           echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
+          echo "Version: $TAG"
           echo "Tarball: $TARBALL"
           echo "SHA256: $SHA256"
 
