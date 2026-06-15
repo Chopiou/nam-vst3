@@ -35,8 +35,8 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           VERSION="${TAG#v}"
-          tar -czf "Namloader-${TAG}.tar.gz" -C build NAMLoader.vst3
-          echo "TAR_NAME=Namloader-${TAG}.tar.gz" >> $GITHUB_ENV
+          tar -czf "Namloader-v${VERSION}-macos-universal.vst3.tar.gz" -C build NAMLoader.vst3
+          echo "TAR_NAME=Namloader-v${VERSION}-macos-universal.vst3.tar.gz" >> $GITHUB_ENV
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
@@ -66,7 +66,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/Namloader-macos-universal/Namloader-${{ github.ref_name }}.tar.gz
+            artifacts/Namloader-macos-universal/Namloader-v${VERSION}-macos-universal.vst3.tar.gz
           generate_release_notes: true
       - name: Update Homebrew tap SHA256
         id: update_sha256
@@ -74,7 +74,8 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          TARBALL="Namloader-${TAG}.tar.gz"
+          VERSION="${TAG#v}"
+          TARBALL="Namloader-v${VERSION}-macos-universal.vst3.tar.gz"
           TARBALL_PATH=$(find artifacts -name "$TARBALL" | head -1)
           if [ -z "$TARBALL_PATH" ] || [ ! -f "$TARBALL_PATH" ]; then
             echo "Tarball not found: $TARBALL" >&2
