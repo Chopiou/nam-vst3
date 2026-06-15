@@ -88,7 +88,7 @@ set(VST3_PLUGINTERFACE_SOURCES
 
 # --- base/source/ sources ---
 set(VST3_BASE_SOURCES
-    ${VST3_SDK_PATH}/base/source/fobject.cpp                # FObject base class
+    ${VST3_SDK_PATH}/base/source/fobject.cpp                # FObject base class, Singleton (uses FLock)
     ${VST3_SDK_PATH}/base/source/fstring.cpp                # ConstString, string ops
     ${VST3_SDK_PATH}/base/source/fdebug.cpp                 # Debug/trace utilities
     ${VST3_SDK_PATH}/base/source/baseiids.cpp               # DEF_CLASS_IID: IString, IPersistent, IAttributes
@@ -96,7 +96,13 @@ set(VST3_BASE_SOURCES
     ${VST3_SDK_PATH}/base/source/fdynlib.cpp                # Dynamic library loading
     ${VST3_SDK_PATH}/base/source/fstreamer.cpp              # Stream I/O utilities
     ${VST3_SDK_PATH}/base/source/timer.cpp                  # Timer support (component lifecycle)
-    ${VST3_SDK_PATH}/base/source/updatehandler.cpp          # Update handler (IDependent)
+    ${VST3_SDK_PATH}/base/source/updatehandler.cpp          # Update handler (IDependent), owns FLock member
+)
+
+# --- base/thread/ sources (CRITICAL — missing = FLock linker errors) ---
+set(VST3_THREAD_SOURCES
+    ${VST3_SDK_PATH}/base/thread/source/flock.cpp           # FLock: recursive mutex (used by Singleton, UpdateHandler)
+    ${VST3_SDK_PATH}/base/thread/source/fcondition.cpp      # FCondition: pthread condition variable wrapper
 )
 
 # --- public.sdk/source/ core sources ---
@@ -122,7 +128,7 @@ set(VST3_PUBLICSDK_SOURCES
 )
 
 # Create VST3 SDK static library
-add_library(vst3sdk_static STATIC ${VST3_BASE_SOURCES} ${VST3_PLUGINTERFACE_SOURCES} ${VST3_PUBLICSDK_SOURCES})
+add_library(vst3sdk_static STATIC ${VST3_BASE_SOURCES} ${VST3_THREAD_SOURCES} ${VST3_PLUGINTERFACE_SOURCES} ${VST3_PUBLICSDK_SOURCES})
 
 # Must be compiled with PIC since it's linked into a shared MODULE (.vst3 / .so)
 set_target_properties(vst3sdk_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -130,6 +136,7 @@ set_target_properties(vst3sdk_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(vst3sdk_static PUBLIC
     ${VST3_SDK_PATH}
     ${VST3_SDK_PATH}/public.sdk/source
+    ${VST3_SDK_PATH}/base/thread/include    # FLock, FCondition headers
 )
 
 target_compile_definitions(vst3sdk_static PUBLIC
