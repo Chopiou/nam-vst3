@@ -57,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VERSION: ${{ github.ref_name }}
     steps:
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
@@ -66,15 +68,13 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/Namloader-macos-universal/Namloader-v${VERSION}-macos-universal.vst3.tar.gz
+            artifacts/Namloader-macos-universal/Namloader-${{ env.VERSION }}-macos-universal.vst3.tar.gz
           generate_release_notes: true
       - name: Update Homebrew tap SHA256
         id: update_sha256
         if: success()
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
-          VERSION="${TAG#v}"
+          VERSION="${GITHUB_REF_NAME#v}"
           TARBALL="Namloader-v${VERSION}-macos-universal.vst3.tar.gz"
           TARBALL_PATH=$(find artifacts -name "$TARBALL" | head -1)
           if [ -z "$TARBALL_PATH" ] || [ ! -f "$TARBALL_PATH" ]; then
