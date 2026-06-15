@@ -62,6 +62,17 @@ elseif(APPLE)
   include_directories(/opt/homebrew/include/eigen3 /usr/local/include/eigen3)
 endif()
 
+# ============================================================================
+# VST3 SDK Static Library (base + public.sdk sources)
+# ============================================================================
+
+# VST3 Base sources
+set(VST3_BASE_SOURCES
+    ${VST3_SDK_PATH}/base/source/fobject.cpp
+    ${VST3_SDK_PATH}/base/source/fstring.cpp
+    ${VST3_SDK_PATH}/base/source/fdebug.cpp
+)
+
 # VST3 SDK core sources
 set(VST3_CORE_SOURCES
     # Main entry points
@@ -82,14 +93,27 @@ set(VST3_CORE_SOURCES
     ${VST3_SDK_PATH}/public.sdk/source/vst/vstrepresentation.cpp
 )
 
-# VST3 Base sources (from submodule)
-set(VST3_BASE_SOURCES
-    ${VST3_SDK_PATH}/base/source/fobject.cpp
-    ${VST3_SDK_PATH}/base/source/fstring.cpp
-    ${VST3_SDK_PATH}/base/source/fdebug.cpp
+# Create VST3 SDK static library
+add_library(vst3sdk_static STATIC ${VST3_BASE_SOURCES} ${VST3_CORE_SOURCES})
+
+target_include_directories(vst3sdk_static PUBLIC
+    ${VST3_SDK_PATH}
+    ${VST3_SDK_PATH}/public.sdk/source
 )
 
+target_compile_definitions(vst3sdk_static PUBLIC
+    VST3_API
+)
+
+if(APPLE)
+  target_compile_definitions(vst3sdk_static PUBLIC MAC MACOS)
+elseif(LINUX)
+  target_compile_definitions(vst3sdk_static PUBLIC __linux__ LINUX)
+endif()
+
+# ============================================================================
 # Plugin sources
+# ============================================================================
 set(PLUGIN_SOURCES
     src/NAMProcessor.cpp
     src/NAMController.cpp
@@ -99,18 +123,18 @@ set(PLUGIN_SOURCES
     src/plugentry.cpp
 )
 
-# All sources
-set(ALL_SOURCES ${VST3_CORE_SOURCES} ${VST3_BASE_SOURCES} ${PLUGIN_SOURCES})
-
-# Include directories - must include SDK root for pluginterfaces and base
+# Include directories for plugin
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${VST3_SDK_PATH}                    # For pluginterfaces/, base/
-    ${VST3_SDK_PATH}/public.sdk/source  # For public.sdk/source/vst/...
+    ${VST3_SDK_PATH}
+    ${VST3_SDK_PATH}/public.sdk/source
 )
 
 # Create plugin as shared library
-add_library(${PLUGIN_NAME} MODULE ${ALL_SOURCES})
+add_library(${PLUGIN_NAME} MODULE ${PLUGIN_SOURCES})
+
+# Link against VST3 SDK static library
+target_link_libraries(${PLUGIN_NAME} PRIVATE vst3sdk_static)
 
 # Platform-specific target properties and compile definitions
 if(APPLE)
