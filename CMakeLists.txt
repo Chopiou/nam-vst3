@@ -6,7 +6,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # SDK paths - use the full VST3 SDK with submodules
-set(VST3_SDK_PATH "/home/chopiou/vst3sdk" CACHE PATH "Path to VST3 SDK root (must contain pluginterfaces, base, public.sdk)")
+# Default to local path, can be overridden via -DVST3_SDK_PATH=... or env var
+set(VST3_SDK_PATH_DEFAULT "/home/chopiou/Hermes-Cloud/audio/projects/vst3sdk")
+if(DEFINED ENV{VST3_SDK_PATH})
+  set(VST3_SDK_PATH $ENV{VST3_SDK_PATH})
+else()
+  set(VST3_SDK_PATH "${VST3_SDK_PATH_DEFAULT}" CACHE PATH "Path to VST3 SDK root (must contain pluginterfaces, base, public.sdk)")
+endif()
+
+# Verify SDK exists
+if(NOT EXISTS "${VST3_SDK_PATH}/public.sdk/source/main/pluginfactory.cpp")
+  message(FATAL_ERROR "VST3 SDK not found at ${VST3_SDK_PATH}. Set VST3_SDK_PATH or VST3_SDK_PATH env var.")
+endif()
 
 # Plugin configuration
 set(PLUGIN_NAME "NAMLoader")
