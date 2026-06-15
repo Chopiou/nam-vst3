@@ -176,16 +176,18 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE vst3sdk_static)
 
 # Platform-specific target properties and compile definitions
 if(APPLE)
-  # macOS bundle properties
+  # macOS: build as flat MODULE binary, then POST_BUILD wraps into VST3 bundle dir
+  # MACOSX_BUNDLE TRUE + SUFFIX ".vst3" creates a FILE named NAMLoader.vst3,
+  # then POST_BUILD fails trying to mkdir inside it ("Not a directory").
+  # Instead: produce NAMLoader.bundle flat binary, POST_BUILD creates the
+  # .vst3/Contents/MacOS/ directory structure manually.
   set_target_properties(${PLUGIN_NAME} PROPERTIES
       PREFIX ""
-      SUFFIX ".vst3"
+      SUFFIX ".bundle"
       OUTPUT_NAME "NAMLoader"
       CXX_STANDARD 17
       CXX_STANDARD_REQUIRED ON
       POSITION_INDEPENDENT_CODE ON
-      MACOSX_BUNDLE TRUE
-      MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
   )
   target_compile_definitions(${PLUGIN_NAME} PRIVATE
       VST3_API
