@@ -45,17 +45,24 @@ jobs:
           mkdir build && cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
           cmake --build . --config Release -j$(sysctl -n hw.ncpu)
-      - name: Codesign (requires Apple Developer ID)
-        if: env.APPLE_DEVELOPER_ID != ''
+      - name: Ad-hoc codesign (no Apple ID required)
         run: |
-          codesign --force --deep --sign "${{ env.APPLE_DEVELOPER_ID }}" build/NAMLoader.vst3
-        env:
-          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          codesign --force --deep --sign - --timestamp=none build/NAMLoader.vst3
+      - name: Package macOS universal tar.gz
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          tar -czf "Namloader-v${VERSION}-macos-universal.vst3.tar.gz" -C build NAMLoader.vst3
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: NAMLoader-macos.vst3
           path: build/NAMLoader.vst3
+          retention-days: 30
+      - name: Upload macOS tar.gz for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: Namloader-macos-universal.tar.gz
+          path: Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz
           retention-days: 30
 
   windows:
@@ -84,16 +91,57 @@ jobs:
     needs: [linux, macos, windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Required for pushing to homebrew tap repo
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Create release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/NAMLoader-linux.vst3/NAMLoader.vst3
-            artifacts/NAMLoader-macos.vst3/NAMLoader.vst3
+            artifacts/Namloader-macos-universal.tar.gz/Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz
             artifacts/NAMLoader-windows.vst3/NAMLoader.vst3
           generate_release_notes: true
+
+      - name: Update Homebrew tap SHA256
+        if: success()
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          TARBALL="Namloader-v${VERSION}-macos-universal.vst3.tar.gz"
+          # Find the downloaded tarball
+          TARBALL_PATH=$(find artifacts -name "$TARBALL" | head -1)
+          if [ -z "$TARBALL_PATH" ] || [ ! -f "$TARBALL_PATH" ]; then
+            echo "Tarball not found: $TARBALL"
+            exit 1
+          fi
+          SHA256=$(sha256sum "$TARBALL_PATH" | cut -d' ' -f1)
+          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          echo "Tarball: $TARBALL"
+          echo "SHA256: $SHA256"
+
+      - name: Commit SHA256 to homebrew tap
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: Chopiou/homebrew-namloader
+          branch: update-sha256-${{ github.ref_name }}
+          base: main
+          commit-message: "Update SHA256 for Namloader ${{ github.ref_name }}"
+          title: "Update SHA256 for Namloader ${{ github.ref_name }}"
+          body: |
+            Auto-update SHA256 for [Namloader ${{ github.ref_name }}](https://github.com/Chopiou/nam-vst3/releases/tag/${{ github.ref_name }})
+            
+            - Tarball: `Namloader-v${{ github.ref_name#v }}-macos-universal.vst3.tar.gz`
+            - SHA256: `${{ steps.update_homebrew_tap_sha256.outputs.SHA256 }}`
+          files: |
+            Formula/namloader.rb
+          path-modification: |
+            sed -i '' 's/sha256 "PLACEHOLDER_UPDATED_BY_CI"/sha256 "${{ steps.update_homebrew_tap_sha256.outputs.SHA256 }}"/' Formula/namloader.rb
+            sed -i '' 's/version "0.1.0"/version "${{ github.ref_name#v }}"/' Formula/namloader.rb
