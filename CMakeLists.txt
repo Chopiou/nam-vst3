@@ -159,12 +159,7 @@ if(APPLE)
       "-framework AudioToolbox"
       "-framework CoreFoundation"
   )
-  # POST_BUILD: ensure Resources directory exists
-  add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E make_directory
-          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/Resources
-      COMMENT "Ensure VST3 Resources directory exists"
-  )
+  # POST_BUILD not needed - MACOSX_BUNDLE handles bundle creation automatically
 
 elseif(LINUX)
   set_target_properties(${PLUGIN_NAME} PROPERTIES
