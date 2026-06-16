@@ -113,7 +113,7 @@ elseif(LINUX)
 endif()
 
 # ================================================================
-# PLUGIN TARGET — CORRECTED FOR macOS VST3
+# PLUGIN TARGET — WORKS WITH WORKFLOW'S CUSTOM UNIVERSAL BUILD
 # ================================================================
 set(PLUGIN_SOURCES
     src/NAMProcessor.cpp
@@ -134,7 +134,8 @@ add_library(${PLUGIN_NAME} MODULE ${PLUGIN_SOURCES})
 target_link_libraries(${PLUGIN_NAME} PRIVATE vst3sdk_static)
 
 if(APPLE)
-  # KEY FIX: Build as MACOSX_BUNDLE with proper VST3 structure
+  # Build as plain dylib for workflow's custom universal build
+  # Workflow handles: arm64 build → x86_64 build → lipo → bundle creation
   set_target_properties(${PLUGIN_NAME} PROPERTIES
       PREFIX ""
       SUFFIX ".vst3"
@@ -142,14 +143,6 @@ if(APPLE)
       CXX_STANDARD 17
       CXX_STANDARD_REQUIRED ON
       POSITION_INDEPENDENT_CODE ON
-      MACOSX_BUNDLE TRUE
-      MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
-      MACOSX_BUNDLE_BUNDLE_NAME "NAMLoader"
-      MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-      MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
-      MACOSX_BUNDLE_GUI_IDENTIFIER com.chopiou.namloader
-      MACOSX_BUNDLE_LONG_VERSION_STRING "NAM Loader ${PROJECT_VERSION}"
-      MACOSX_BUNDLE_COPYRIGHT "Copyright 2025 Chopiou"
   )
   target_compile_definitions(${PLUGIN_NAME} PRIVATE
       VST3_API MAC MACOS _LARGEFILE64_SOURCE NDEBUG
@@ -159,7 +152,6 @@ if(APPLE)
       "-framework AudioToolbox"
       "-framework CoreFoundation"
   )
-  # POST_BUILD not needed - MACOSX_BUNDLE handles bundle creation automatically
 
 elseif(LINUX)
   set_target_properties(${PLUGIN_NAME} PROPERTIES
