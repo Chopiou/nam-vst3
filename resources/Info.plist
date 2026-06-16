@@ -27,7 +27,9 @@
     <key>DTPlatformName</key>
     <string>macos</string>
     <key>NSPrincipalClass</key>
-    <string>NAMController</string>
+    <string>NSApplication</string>
+    <key>CFBundleExecutable</key>
+    <string>NAMLoader</string>
     <key>VST3Plugin</key>
     <dict>
         <key>Categories</key>
