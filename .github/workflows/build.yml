@@ -21,11 +21,30 @@ jobs:
       - name: Install dependencies
         run: |
           brew install cmake eigen pkg-config
-      - name: Build macOS VST3 (Universal)
+      - name: Build macOS VST3 (Universal - arm64 + x86_64)
         run: |
           rm -rf build && mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DVST3_SDK_PATH="${{ runner.temp }}/vst3sdk"
+          # Build for arm64
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DVST3_SDK_PATH="${{ runner.temp }}/vst3sdk"
           cmake --build . --config Release -j$(sysctl -n hw.ncpu)
+          mkdir -p ../build_arm64 && cp -R NAMLoader.vst3 ../build_arm64/
+          # Clean and build for x86_64
+          rm -rf *
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DVST3_SDK_PATH="${{ runner.temp }}/vst3sdk"
+          cmake --build . --config Release -j$(sysctl -n hw.ncpu)
+          mkdir -p ../build_x86_64 && cp -R NAMLoader.vst3 ../build_x86_64/
+          # Create universal binary with lipo
+          mkdir -p ../build_universal
+          cp -R ../build_arm64/NAMLoader.vst3 ../build_universal/
+          lipo -create \
+            ../build_arm64/NAMLoader.vst3/Contents/MacOS/NAMLoader \
+            ../build_x86_64/NAMLoader.vst3/Contents/MacOS/NAMLoader \
+            -output ../build_universal/NAMLoader.vst3/Contents/MacOS/NAMLoader
+          # Copy the rest of the bundle structure
+          cp -R ../build_arm64/NAMLoader.vst3/Contents/Info.plist ../build_universal/NAMLoader.vst3/Contents/
+          cp -R ../build_arm64/NAMLoader.vst3/Contents/_CodeSignature ../build_universal/NAMLoader.vst3/Contents/ 2>/dev/null || true
+          # Copy universal bundle to build/ for packaging
+          cp -R ../build_universal/NAMLoader.vst3 .
       - name: Ad-hoc codesign (no Apple ID required)
         run: |
           codesign --force --deep --sign - --timestamp=none build/NAMLoader.vst3
