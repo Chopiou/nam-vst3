@@ -113,7 +113,7 @@ elseif(LINUX)
 endif()
 
 # ================================================================
-# PLUGIN TARGET — WORKS WITH WORKFLOW'S CUSTOM UNIVERSAL BUILD
+# PLUGIN TARGET
 # ================================================================
 set(PLUGIN_SOURCES
     src/NAMProcessor.cpp
@@ -134,8 +134,7 @@ add_library(${PLUGIN_NAME} MODULE ${PLUGIN_SOURCES})
 target_link_libraries(${PLUGIN_NAME} PRIVATE vst3sdk_static)
 
 if(APPLE)
-  # Build as plain dylib for workflow's custom universal build
-  # Workflow handles: arm64 build → x86_64 build → lipo → bundle creation
+  # Build as dylib that gets wrapped into bundle by workflow
   set_target_properties(${PLUGIN_NAME} PROPERTIES
       PREFIX ""
       SUFFIX ".vst3"
@@ -151,6 +150,19 @@ if(APPLE)
       "-framework Cocoa"
       "-framework AudioToolbox"
       "-framework CoreFoundation"
+  )
+
+  # POST_BUILD: create bundle structure for workflow's arm64/x86_64 builds
+  add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/MacOS
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          $<TARGET_FILE:${PLUGIN_NAME}>
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/MacOS/NAMLoader
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          ${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist
+          $<TARGET_FILE_DIR:${PLUGIN_NAME}>/NAMLoader.vst3/Contents/Info.plist
+      COMMENT "Creating macOS VST3 bundle structure for workflow's universal build"
   )
 
 elseif(LINUX)
