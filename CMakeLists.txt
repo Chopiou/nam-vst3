@@ -50,10 +50,14 @@ endif()
 
 set(PLUGIN_NAME "NAMLoader")
 find_package(PkgConfig REQUIRED)
-if(LINUX) find_package(X11 REQUIRED) endif()
-
-if(LINUX) include_directories(/usr/include/eigen3)
-elseif(APPLE) include_directories(/opt/homebrew/include/eigen3 /usr/local/include/eigen3) endif()
+if(LINUX)
+  find_package(X11 REQUIRED)
+endif()
+if(LINUX)
+  include_directories(/usr/include/eigen3)
+elseif(APPLE)
+  include_directories(/opt/homebrew/include/eigen3 /usr/local/include/eigen3)
+endif()
 
 # --- VST3 SDK Static Library ---
 set(VST3_PLUGINTERFACE_SOURCES
