@@ -106,8 +106,11 @@ target_include_directories(vst3sdk_static PUBLIC
     ${VST3_SDK_PATH}/base/thread/include
 )
 target_compile_definitions(vst3sdk_static PUBLIC VST3_API)
-if(APPLE) target_compile_definitions(vst3sdk_static PUBLIC MAC MACOS)
-elseif(LINUX) target_compile_definitions(vst3sdk_static PUBLIC __linux__ LINUX) endif()
+if(APPLE)
+  target_compile_definitions(vst3sdk_static PUBLIC MAC MACOS)
+elseif(LINUX)
+  target_compile_definitions(vst3sdk_static PUBLIC __linux__ LINUX)
+endif()
 
 # ================================================================
 # PLUGIN TARGET — CORRECTED FOR macOS VST3
